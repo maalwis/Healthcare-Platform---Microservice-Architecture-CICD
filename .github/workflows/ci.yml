@@ -2,10 +2,10 @@ name: Java CI with Maven and Docker
 
 on:
   push:
-    branches: [ "AuthenticationService" ]  # <-- No space here
+    branches: [ "AppointmentService" ]  # <-- No space here
 
 env:
-  SERVICE_NAME: AuthenticationService
+  SERVICE_NAME: AppointmentService
 
 jobs:
   compile:
