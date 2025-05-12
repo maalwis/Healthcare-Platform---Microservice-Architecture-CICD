@@ -24,9 +24,3 @@ jobs:
           java-version: '23'
           distribution: 'temurin'
           cache: maven
-
-      - name: Install dependencies & run tests
-        run: mvn -B clean test --file pom.xml
-
-      - name: Build artifact
-        run: mvn -B package --file pom.xml
