@@ -47,7 +47,7 @@ This repository implements a modular healthcare platform using microservices. Ea
 
 ## Architecture
 
-![System Architecture](docs/kubernetes-architecture.svg)
+![System Architecture](docs/kubernetes.svg)
 
 > Logical grouping:
 >
