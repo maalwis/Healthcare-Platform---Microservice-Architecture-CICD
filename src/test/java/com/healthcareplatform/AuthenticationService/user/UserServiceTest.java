@@ -5,11 +5,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -18,14 +22,21 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 public class UserServiceTest {
 
+    private static final String SIGNUP_METHOD_EMAIL = "EMAIL";
     private UserService userServiceTest;
-
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private PasswordEncoder passwordEncoder;
+    private int credentialsExpiryMonths;
+    private int accountExpiryMonths;
+
+    private final Instant fixedInstant = Instant.parse("2025-05-12T10:00:00Z");
 
     @BeforeEach
     public void setUp() {
-        userServiceTest = new UserService(userRepository);
+        userServiceTest = new UserService(userRepository, passwordEncoder,
+                credentialsExpiryMonths, accountExpiryMonths );
     }
 
     @Test
@@ -59,7 +70,7 @@ public class UserServiceTest {
         user.setSignUpMethod("custom email");
 
         // roles
-         user.setUserRoles(Set.of(new UserRole()));
+        user.setUserRoles(Set.of(new UserRole()));
 
         // 2. Stub the repository to return our fake user
         when(userRepository.findAll())
@@ -90,7 +101,50 @@ public class UserServiceTest {
 
 
         // mapped roles into the DTO:
-         assertNotNull(userResponse.getUserRoles());
-         assertEquals(1, userResponse.getUserRoles().size());
+        assertNotNull(userResponse.getUserRoles());
+        assertEquals(1, userResponse.getUserRoles().size());
     }
+
+    @Test
+    void getUserByIdTest() {
+        // 1. Prepare a fake User
+        User user = User.builder()
+                .userId(42L)
+                .employeeId("emp-42")
+                .fullName("Dora Explorer")
+                .username("dora")
+                .email("dora@example.com")
+                .hireDate(LocalDateTime.ofInstant(fixedInstant, ZoneOffset.UTC))
+                .accountNonLocked(true)
+                .accountNonExpired(true)
+                .credentialsNonExpired(true)
+                .enabled(true)
+                .credentialsExpiryDate(LocalDate.of(2025,5,12).plusMonths(3))
+                .accountExpiryDate(LocalDate.of(2025,5,12).plusMonths(12))
+                .twoFactorSecret("manual")
+                .isTwoFactorEnabled(false)
+                .signUpMethod("custom email")
+                .build();
+
+        // 2. Stub repository
+        when(userRepository.findById(42L)).thenReturn(Optional.of(user));
+
+        // 3. Execute
+        UserResponse resp = userServiceTest.getUserById(42L);
+
+        // 4. Verify
+        verify(userRepository, times(1)).findById(42L);
+
+        // 5. Assert mapping
+        assertEquals(42L, resp.getUserId());
+        assertEquals("emp-42", resp.getEmployeeId());
+        assertEquals("Dora Explorer", resp.getFullName());
+        assertEquals("dora", resp.getUsername());
+        assertEquals("dora@example.com", resp.getEmail());
+        assertEquals(LocalDateTime.ofInstant(fixedInstant, ZoneOffset.UTC), resp.getHireDate());
+        assertEquals(LocalDate.of(2025,5,12).plusMonths(3), resp.getCredentialsExpiryDate());
+        assertEquals(LocalDate.of(2025,5,12).plusMonths(12), resp.getAccountExpiryDate());
+
+    }
+
 }
