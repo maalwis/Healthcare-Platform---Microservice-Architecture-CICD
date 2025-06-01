@@ -6,21 +6,94 @@ on:
 
 env:
   SERVICE_NAME: AuthenticationService
+  DOCKER_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/${{ env.SERVICE_NAME }}
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
+  build-and-test:
+    runs-on: ubuntu-latest
+
+#    services:
+#      postgres:
+#        image: postgres:13
+#        ports:
+#          - 5432:5432
+#        env:
+#          POSTGRES_USER: test
+#          POSTGRES_PASSWORD: test
+#          POSTGRES_DB: testdb
+#        options: >-
+#          --health-cmd="pg_isready -U test -d testdb"
+#          --health-interval=10s
+#          --health-timeout=5s
+#          --health-retries=5
+#
+#    steps:
+#      - name: Checkout repository
+#        uses: actions/checkout@v4
+#
+#      - name: Set up JDK 23
+#        uses: actions/setup-java@v4
+#        with:
+#          distribution: temurin
+#          java-version: '23'
+#          cache: maven
+#
+#      - name: Wait for Postgres to be ready
+#        run: |
+#          until pg_isready -h localhost -p 5432 -U test; do
+#            echo "Waiting for Postgres..."
+#            sleep 5
+#          done
+#
+#      - name: Configure Spring Boot datasource for tests
+#        run: |
+#          echo "spring.datasource.url=jdbc:postgresql://localhost:5432/testdb" >> src/test/resources/application-test.properties
+#          echo "spring.datasource.username=test"       >> src/test/resources/application-test.properties
+#          echo "spring.datasource.password=test"       >> src/test/resources/application-test.properties
+#
+#      - name: Run unit tests and generate coverage report
+#        run: mvn test jacoco:report jacoco:check \
+#          -Djacoco.check.rules=rule \
+#          -Djacoco.check.rule=minimumCoverage \
+#          -Djacoco.check.breachIgnoring=false \
+#          -Djacoco.check.minimumCoverage=0.90
+#
+#      - name: Run integration tests
+#        run: mvn verify -Pintegration-test
+#
+#      - name: Package JAR
+#        run: mvn -B package --file pom.xml
+
+  docker-build-and-push:
+    needs: build-and-test
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 23
-        uses: actions/setup-java@v4
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
         with:
-          java-version: '23'
-          distribution: 'temurin'
-          cache: maven
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Set up QEMU for multi-platform builds
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:latest
+            ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
+
+      - name: Log out from Docker Hub
+        run: docker logout
